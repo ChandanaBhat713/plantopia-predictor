@@ -1,7 +1,7 @@
 
 import axios from 'axios';
 
-// Base URL for API - update with your Django backend URL
+// Base URL for API - update with your FastAPI backend URL
 const API_URL = process.env.NODE_ENV === 'production' 
   ? 'https://your-production-api.com/api' 
   : 'http://localhost:8000/api';

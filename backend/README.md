@@ -1,7 +1,7 @@
 
-# Plant Disease Detection Backend API
+# Plant Disease Detection FastAPI Backend
 
-This is a Django REST API backend for the Plant Disease Detection application. It uses a CNN model to predict plant diseases from uploaded images.
+This is a FastAPI backend for the Plant Disease Detection application. It uses a CNN model to predict plant diseases from uploaded images.
 
 ## Setup Instructions
 
@@ -13,26 +13,20 @@ pip install -r requirements.txt
 ### 2. Add your CNN model:
 Place your trained CNN model file at:
 ```
-prediction/ml_models/leaf_disease_model.keras
+ml_models/leaf_disease_model.keras
 ```
 
-### 3. Run migrations:
+### 3. Run the FastAPI server:
 ```
-python manage.py makemigrations
-python manage.py migrate
-```
-
-### 4. Create a superuser (optional):
-```
-python manage.py createsuperuser
-```
-
-### 5. Run the development server:
-```
-python manage.py runserver
+uvicorn main:app --reload
 ```
 
 The API will be available at `http://localhost:8000/api/`
+
+### 4. Automatic API Documentation:
+FastAPI provides automatic API documentation:
+- Swagger UI: http://localhost:8000/docs
+- ReDoc: http://localhost:8000/redoc
 
 ## API Endpoints
 
