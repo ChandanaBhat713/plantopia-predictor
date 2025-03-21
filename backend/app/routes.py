@@ -1,16 +1,16 @@
-
 import os
 import uuid
 from fastapi import APIRouter, UploadFile, File, HTTPException
 from typing import List
 
+from .config import API_V1_STR, UPLOAD_DIR, TEMP_DIR
 from .models import TreatmentResponse, PlantInfoResponse, PredictionResponse, ScanResponse
 from .database import add_scan, get_all_scans, get_scan_by_id
 from .utils import save_uploaded_image, get_demo_sources, get_demo_treatments, get_demo_plants_info
 from ml_model import predict_leaf_disease
 
 # Initialize router
-router = APIRouter(prefix="/api")
+router = APIRouter(prefix=API_V1_STR)
 
 @router.post("/predict", response_model=PredictionResponse)
 async def predict_plant_disease(image: UploadFile = File(...)):
