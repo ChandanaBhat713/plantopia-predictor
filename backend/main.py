@@ -17,6 +17,7 @@ from app.config import (
 )
 from ml_model import load_model_into_memory
 from app.routes import router
+from app.database import initialize_database
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -34,10 +35,11 @@ app.add_middleware(
     allow_headers=CORS_ALLOW_HEADERS,
 )
 
-# Check TensorFlow Serving status when application starts
+# Check TensorFlow Serving status and initialize database when application starts
 @app.on_event("startup")
 def startup_event():
     load_model_into_memory()
+    initialize_database()
 
 # Mount static files directory for serving media
 app.mount("/media", StaticFiles(directory=MEDIA_DIR), name="media")
