@@ -2,13 +2,21 @@
 import os
 import numpy as np
 import time
+import json
+import requests
 from PIL import Image
 import logging
+from typing import Dict, Any, Optional
 
 logger = logging.getLogger(__name__)
 
-# Global variables
-MODEL = None
+# Configuration for TensorFlow Serving
+TF_SERVING_HOST = os.environ.get("TF_SERVING_HOST", "localhost")
+TF_SERVING_PORT = os.environ.get("TF_SERVING_PORT", "8501")
+TF_SERVING_MODEL_NAME = os.environ.get("TF_SERVING_MODEL_NAME", "leaf_disease_model")
+TF_SERVING_URL = f"http://{TF_SERVING_HOST}:{TF_SERVING_PORT}/v1/models/{TF_SERVING_MODEL_NAME}:predict"
+
+# Disease classes and descriptions (same as before)
 DISEASE_CLASSES = [
     "Apple___Apple_scab",
     "Apple___Black_rot",
@@ -60,35 +68,27 @@ DISEASE_TREATMENTS = {
     # Add more treatments as needed
 }
 
-def load_model_into_memory():
-    """Load the CNN model into memory when the FastAPI app starts."""
-    global MODEL
+def check_tf_serving_status() -> bool:
+    """Check if TensorFlow Serving is available."""
     try:
-        # Update this path to where your model file is located
-        model_path = os.path.join(os.path.dirname(__file__), 'ml_models', 'leaf_disease_model.keras')
-        
-        # Create directory if it doesn't exist
-        os.makedirs(os.path.dirname(model_path), exist_ok=True)
-        
-        # Check if model exists, if not create a placeholder message
-        if not os.path.exists(model_path):
-            logger.warning(f"Model file not found at {model_path}!")
-            logger.warning("You will need to place your trained model at this location")
-            # Create a placeholder directory to indicate where the model should go
-            os.makedirs(os.path.dirname(model_path), exist_ok=True)
-            with open(model_path + ".placeholder", "w") as f:
-                f.write("Place your leaf_disease_model.keras file here")
-            return
-        
-        # Lazy import tensorflow to avoid loading it until necessary
-        import tensorflow as tf
-        
-        logger.info(f"Loading model from {model_path}")
-        MODEL = tf.keras.models.load_model(model_path, compile=False)
-        logger.info("Model loaded successfully")
+        response = requests.get(f"http://{TF_SERVING_HOST}:{TF_SERVING_PORT}/v1/models/{TF_SERVING_MODEL_NAME}")
+        if response.status_code == 200:
+            logger.info("TensorFlow Serving is available")
+            return True
+        else:
+            logger.error(f"TensorFlow Serving returned status code: {response.status_code}")
+            return False
     except Exception as e:
-        logger.error(f"Error loading model: {str(e)}")
-        MODEL = None
+        logger.error(f"Error connecting to TensorFlow Serving: {str(e)}")
+        return False
+
+def load_model_into_memory():
+    """Check if TensorFlow Serving is available."""
+    if check_tf_serving_status():
+        logger.info("TensorFlow Serving is ready to handle predictions")
+    else:
+        logger.warning("TensorFlow Serving is not available. Please start TensorFlow Serving with the appropriate model.")
+        logger.warning("Example command: tensorflow_model_server --rest_api_port=8501 --model_name=leaf_disease_model --model_base_path=/path/to/models/leaf_disease_model")
 
 def preprocess_image(image_path):
     """Loads and preprocesses an image for model prediction."""
@@ -96,38 +96,47 @@ def preprocess_image(image_path):
         img = Image.open(image_path).convert('RGB')  # Ensure 3-channel RGB
         img = img.resize((224, 224))  # Resize to model's input size
         img_array = np.array(img) / 255.0  # Normalize pixel values (0-1)
-        img_array = np.expand_dims(img_array, axis=0)  # Add batch dimension
         return img_array
     except Exception as e:
         logger.error(f"Error preprocessing image: {str(e)}")
         raise
 
 def predict_leaf_disease(image_path):
-    """Runs inference on an image and returns the predicted class and metadata."""
-    if MODEL is None:
-        logger.error("Model not loaded. Cannot make predictions.")
-        return {
-            "error": "Model not loaded. Ensure the model file is in the correct location.",
-            "disease": "Unknown",
-            "confidence": 0.0,
-            "description": "",
-            "treatment": ""
-        }
-    
+    """Runs inference using TensorFlow Serving and returns the predicted class and metadata."""
     try:
-        # Lazy import tensorflow to avoid loading it until necessary
-        import tensorflow as tf
-        
+        # Preprocess the image
         img_array = preprocess_image(image_path)
+        
+        # Create the request payload
+        payload = {
+            "signature_name": "serving_default",
+            "instances": [img_array.tolist()]
+        }
         
         # Measure inference time
         start_time = time.time()
-        predictions = MODEL.predict(img_array)
+        
+        # Make request to TensorFlow Serving
+        response = requests.post(TF_SERVING_URL, json=payload)
+        
+        if response.status_code != 200:
+            logger.error(f"Error from TensorFlow Serving: {response.text}")
+            return {
+                "error": f"TensorFlow Serving returned status code {response.status_code}",
+                "disease": "Error",
+                "confidence": 0.0,
+                "description": "An error occurred during prediction",
+                "treatment": ""
+            }
+        
         end_time = time.time()
         
+        # Parse the response
+        predictions = response.json()["predictions"][0]
+        
         # Get the predicted class
-        predicted_class_index = np.argmax(predictions[0])
-        confidence_score = float(np.max(predictions[0]))  # Convert to Python float for JSON serialization
+        predicted_class_index = np.argmax(predictions)
+        confidence_score = float(np.max(predictions))  # Convert to Python float for JSON serialization
         
         # Get class name, description, and treatment
         if predicted_class_index < len(DISEASE_CLASSES):

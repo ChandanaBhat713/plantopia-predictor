@@ -4,6 +4,8 @@ uvicorn==0.27.1
 python-multipart==0.0.9
 numpy==1.26.4
 tensorflow==2.15.0
+tensorflow-serving-api==2.15.0
 pillow==10.2.0
 pydantic==2.6.1
 python-magic==0.4.27
+requests==2.31.0

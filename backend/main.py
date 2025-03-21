@@ -1,4 +1,3 @@
-
 import os
 import uuid
 from fastapi import FastAPI, UploadFile, File, HTTPException
@@ -16,7 +15,7 @@ from ml_model import load_model_into_memory, predict_leaf_disease
 # Initialize FastAPI app
 app = FastAPI(
     title="Plant Disease API",
-    description="API for plant disease detection using CNN",
+    description="API for plant disease detection using TensorFlow Serving",
     version="1.0.0"
 )
 
@@ -33,7 +32,7 @@ app.add_middleware(
 os.makedirs("media/plant_images", exist_ok=True)
 os.makedirs("media/temp_uploads", exist_ok=True)
 
-# Load model when application starts
+# Check TensorFlow Serving status when application starts
 @app.on_event("startup")
 def startup_event():
     load_model_into_memory()
@@ -90,7 +89,7 @@ async def predict_plant_disease(image: UploadFile = File(...)):
         with open(temp_file_path, "wb") as f:
             f.write(contents)
         
-        # Make prediction
+        # Make prediction using TensorFlow Serving
         prediction_result = predict_leaf_disease(temp_file_path)
         
         # Check if there was an error
